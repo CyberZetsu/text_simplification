@@ -40,8 +40,6 @@ def get_synonyms(word):
 def main():
     # 1. Get user input for the text to simplify
     text = input("Enter the text to be simplified:\n")
-    score = textstat.flesch_reading_ease(text)
-    grade_level = textstat.flesch_kincaid_grade(text)
 
     print(f"Flesch Reading Ease: {score}")
     print(f"Flesch-Kincaid Grade Level: {grade_level}")
