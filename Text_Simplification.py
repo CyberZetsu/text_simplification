@@ -4,6 +4,7 @@ import difflib                     # Standard library for computing differences 
 import requests                    # For calling the Thesaurus API
 import json                        # For handling JSON responses from the API (if needed)
 from APIs import API_KEYS
+from readability import Readability
 
 # Load the two text simplification models using Hugging Face pipelines.
 # Use the "summarization" task for both models.
@@ -35,7 +36,25 @@ def get_synonyms(word):
 # Main script functionality
 def main():
     # 1. Get user input for the text to simplify
-    text = input("Enter the text to be simplified:\n")
+#    text = input("Enter the text to be simplified:\n")
+
+    text = ("The ontological implications of epistemological relativism, when considered through a prism of hermeneutic phenomenology, reveal a paradoxical tension between the subjectivity of human cognition and the purported objectivity of universal truths, suggesting that the dichotomy between empirical realism and idealist abstraction might be more malleable than traditionally assumed. As such, one must critically engage with the semiotic structures embedded within cultural paradigms, recognizing that language, as a constitutive force, both shapes and constrains the conceptualization of reality, potentially rendering any attempt at unmediated, objective understanding not only elusive but inherently flawed.")
+    r =Readability(text)
+    fk =r.flesch_kincaid()
+    print(fk.score)
+    print(fk.grade_level)
+
+
+#    print(r.flesch_kincaid())
+ #   print(r.flesch())
+  #  print(r.gunning_fog())
+   # print(r.coleman_liau())
+    #print(r.dale_chall())
+#    print(r.ari())
+ #   print(r.linsear_write())
+  #  print(r.smog())
+   # print(r.spache())
+
 
     # 2. Generate simplified text using BART summarization model
     # We use max_length and min_length to control summary length; adjust as needed.
