@@ -4,7 +4,7 @@ import difflib                     # Standard library for computing differences 
 import requests                    # For calling the Thesaurus API
 import json                        # For handling JSON responses from the API (if needed)
 from APIs import API_KEYS
-from readability import Readability
+import textstat
 
 
 
@@ -40,11 +40,11 @@ def get_synonyms(word):
 def main():
     # 1. Get user input for the text to simplify
     text = input("Enter the text to be simplified:\n")
-    a = Readability(text)
-    ab = a.flesch_kincaid()
-    print(ab.score)
-    print(ab.grade_level)
+    score = textstat.flesch_reading_ease(text)
+    grade_level = textstat.flesch_kincaid_grade(text)
 
+    print(f"Flesch Reading Ease: {score}")
+    print(f"Flesch-Kincaid Grade Level: {grade_level}")
 
 
 
