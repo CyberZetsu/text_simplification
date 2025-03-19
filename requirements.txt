@@ -3,4 +3,6 @@ torch=2.4.1
 difflib
 requests
 py-readability-metrics
+readability-lxml
 nltk
+textstat
