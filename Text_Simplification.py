@@ -1,3 +1,5 @@
+## Nettskjema and Google Forms
+
 # Required libraries
 from transformers import pipeline  # Hugging Face Transformers pipeline for summarization
 import difflib                     # Standard library for computing differences between texts
@@ -5,16 +7,17 @@ import requests                    # For calling the Thesaurus API
 import json                        # For handling JSON responses from the API (if needed)
 from APIs import API_KEYS
 import textstat
-
+# from datasets import AllCombined
 
 
 
 # Load the two text simplification models using Hugging Face pipelines.
 # Use the "summarization" task for both models.
 # BART Large CNN is a high-quality summarization .
+
 bart_summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 # T5-small can perform summarization.
-t5_summarizer   = pipeline("summarization", model="t5-small")
+t5_summarizer   = pipeline("summarization", model="t5-large")
 
 # Function to get synonyms from a Thesaurus API.
 def get_synonyms(word):
@@ -35,16 +38,61 @@ def get_synonyms(word):
     except Exception as e:
         # Handle any exceptions (e.g., network issues)
         return []
+    
+
+
+
+"""def simplify_text(text):
+    # Summarization with texts
+    # 1. Get user input for the text to simplify
+    text = input("Enter the text to be simplified:\n")
+    bart_prompt = (f"Summarize this text for a general audience: {text}")
+    bart_result = bart_summarizer(bart_prompt, max_length= 120, min_length=30, do_sample=False)
+    simplified_bart = bart_result[0]['summary_text']
+
+    t5_prompt = (f"Summarize this text for a general audience: {text}")
+    t5_result =t5_summarizer(t5_prompt, max_length= 120, min_length=30, do_sample= False)
+    simplified_t5= t5_result[0]['summary_text']
+
+    return simplified_bart, simplified_t5
+"""
+    
 
 # Main script functionality
 def main():
     # 1. Get user input for the text to simplify
     text = input("Enter the text to be simplified:\n")
+#    prompt = (f"Summarize this text for a general audience while following these rules:  1. Use active voice instead of passive.  2.Replace written-out numbers with numerical values (e.g., 'ten thousand' → '10,000').  3.Group similar descriptive words into a single simplified term (e.g., 'black, blue, green, white, red, neon' → 'a collection of colors').   4.Convert casual language into a formal tone.  5.Shorten verbal expressions using more direct wording.  6.Adjust verb sentence structures for better readability.  7.Simplify noun structures to make the text clearer and more concise.  Text: {text}")  
+    # Define the rules but make sure they aren't included in the summary itself.
+    prompt = (
+        "summarize this text for a general audience while following these rules:\n"
+        "1. Use active voice instead of passive.\n"
+        "2. Replace written-out numbers with numerical values (e.g., 'ten thousand' → '10,000').\n"
+        "3. Group similar descriptive words into a single simplified term (e.g., 'black, blue, green, white, red, neon' → 'a collection of colors').\n"
+        "4. Convert casual language into a formal tone.\n"
+        "5. Shorten verbal expressions using more direct wording.\n"
+        "6. Adjust verb sentence structures for better readability.\n"
+        "7. Simplify noun structures to make the text clearer and more concise.\n"
+        "8. Avoid redundancy in phrasing.\n"
+        "9. DO NOT WRITE THE RULES IN THE SIMPLIFIED TEXT RESPONSE.\n\n"
+        f"Text: {text}"
+    )
+
+    # Summarize the input text using BART model.
+    bart_result = bart_summarizer(prompt, max_length=120, min_length=30, do_sample=False)
+    simplified_bart = bart_result[0]['summary_text']
+
+    # Summarize the input text using T5 model.
+    t5_result = t5_summarizer(prompt, max_length=120, min_length=30, do_sample=False)
+    simplified_t5 = t5_result[0]['summary_text']
+
+
+
 
     print(f"Flesch Reading Ease: {textstat.flesch_reading_ease(text)}")
     print(f"Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(text)}") #a score of 9.3 means that a ninth grader would be able to understand that sentence
     print(f"Gunning Fog Score:: {textstat.gunning_fog(text)}") # returns the FOG index, a 9.3 means that a ninth grader will understand the paragraph
-#    print(f"Smog Index Score: {textstat.smog_index(text)}") #needs 30 sentences to give a valid score. 9.3 means a ninth grader will understand
+    print(f"Smog Index Score: {textstat.smog_index(text)}") #needs 30 sentences to give a valid score. 9.3 means a ninth grader will understand
     print(f"Automated readability index: {textstat.automated_readability_index(text)}") # gives a number that approximates the grade level needed to understand a 9.5 means between a 9th and 10th grader
     print(f"Coleman Liau index score: {textstat.coleman_liau_index(text)}") # same as the other a 9.3 means a 9th grader will understand
     print(f"Linsar write Formula score: {textstat.linsear_write_formula(text)}") # same as the above a 9.3 means a 9th grader will understand
@@ -57,19 +105,20 @@ def main():
 
 
 
-
+    """
     # 2. Generate simplified text using BART summarization model
     # We use max_length and min_length to control summary length; adjust as needed.
-    bart_result = bart_summarizer(text, max_length=120, min_length=30, do_sample=False)
-    simplified_bart = bart_result[0]['summary_text']
+    #bart_result = bart_summarizer(bart_prompt, max_length=120, min_length=30, do_sample=False)
+    #simplified_bart = bart_result[0]['summary_text']
     
     # 3. Generate simplified text using T5 model.
     # Important: prefix the text with "summarize: " for T5 to signal the task.
-    t5_input = "summarize: " + text
-    t5_result = t5_summarizer(t5_input, max_length=120, min_length=30, do_sample=False)
-    simplified_t5 = t5_result[0]['summary_text']
+    #t5_input = "summarize: " + text
+    #t5_result = t5_summarizer(t5_input, max_length=120, min_length=30, do_sample=False)
+    #simplified_t5 = t5_result[0]['summary_text']
     
-    # 4. Print the original and simplified texts
+    # 4. Print the original and simplified texts"
+    """
     print("\nOriginal Text:\n" + text)
 
     print("\nSimplified Text (BART):\n" + simplified_bart)
@@ -142,8 +191,8 @@ def main():
     bart_new_words = set([w.strip(".,!?").lower() for w in bart_tokens if w.lower() not in [ow.lower() for ow in orig_tokens]])
     # Identify new words in the T5 simplified text
     t5_new_words = set([w.strip(".,!?").lower() for w in t5_tokens if w.lower() not in [ow.lower() for ow in orig_tokens]])
-    
     new_words = bart_new_words.union(t5_new_words)
+    
     if new_words:
         print("\nSynonym suggestions for simplified words:")
         for word in sorted(new_words):
