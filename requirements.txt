@@ -6,3 +6,5 @@ py-readability-metrics
 readability-lxml
 nltk
 textstat
+spacy
+json
