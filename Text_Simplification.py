@@ -10,7 +10,6 @@ import textstat
 # from datasets import AllCombined
 
 
-
 # Load the two text simplification models using Hugging Face pipelines.
 # Use the "summarization" task for both models.
 # BART Large CNN is a high-quality summarization .
