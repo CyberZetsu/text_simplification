@@ -8,3 +8,6 @@ nltk
 textstat
 spacy
 json
+transformers
+accelerate
+tiktoken
