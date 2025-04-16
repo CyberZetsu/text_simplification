@@ -53,7 +53,7 @@ model, tokenizer = load_model_and_tokenizer()
 
 def simplify(text):
     prompt = (
-        "You are an assistant that rewrites technical sentences in plain English for students and non-experts. Keep it formal.\n\n"
+        "You are an assistant that rewrites technical sentences in plain English for students and non-experts. Keep it formal, and concise. Do not hallucinate.\n\n"
         f"Sentence: {text.strip()}\n"
         "Simplified:"
     )
@@ -66,7 +66,7 @@ def simplify(text):
             do_sample=True,
             top_p=0.9,
             top_k=50,
-            temperature=0.2, # originally 0.7
+            temperature=0.4, # originally 0.7
             pad_token_id=tokenizer.pad_token_id,
             eos_token_id=tokenizer.eos_token_id or tokenizer.pad_token_id
         )
