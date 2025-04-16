@@ -66,7 +66,7 @@ def simplify(text):
             do_sample=True,
             top_p=0.9,
             top_k=50,
-            temperature=0.1,
+            temperature=0.2, # originally 0.7
             pad_token_id=tokenizer.pad_token_id,
             eos_token_id=tokenizer.eos_token_id or tokenizer.pad_token_id
         )
