@@ -1,8 +1,9 @@
-transformers=4.49.0
-torch=2.4.1
-difflib
-requests
-py-readability-metrics
-readability-lxml
-nltk
+datasets
+transformers
+peft
+bitsandbytes
+streamlit
 textstat
+tiktoken
+transformers-stream-generator
+einops
