@@ -2,6 +2,8 @@ datasets
 transformers
 peft
 bitsandbytes
-torch
-torchvision
-torchaudio
+streamlit
+textstat
+tiktoken
+transformers-stream-generator
+einops
