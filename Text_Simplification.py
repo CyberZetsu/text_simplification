@@ -1,27 +1,49 @@
-# Required libraries
-from transformers import pipeline  # Hugging Face Transformers pipeline for summarization
-import difflib                     # Standard library for computing differences between texts
-import requests                    # For calling the Thesaurus API
-import json                        # For handling JSON responses from the API (if needed)
-from APIs import API_KEYS
+import streamlit as st
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer, TextGenerationPipeline, BitsAndBytesConfig
+import torch  # For PyTorch model loading and tensor operations
+ # Hugging Face Transformers pipeline for summarization
+import difflib  # Standard library for computing differences between texts
+import requests  # For calling the Thesaurus API
+import json  # For handling JSON responses from the API (
 import textstat
+from APIs import API_KEYS
 
 
-
-
-# Load the two text simplification models using Hugging Face pipelines.
-# Use the "summarization" task for both models.
+# Load the text simplification models using Hugging Face pipelines.
+# Use the "summarization" task for the BART and T5 models.
 # BART Large CNN is a high-quality summarization .
-bart_summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-# T5-small can perform summarization.
-t5_summarizer   = pipeline("summarization", model="t5-small")
+bart_pipeline = pipeline("summarization", model="facebook/bart-large-cnn", token= API_KEYS['HF'])
+
+# T5large summarization due to it not having a "simplification".
+t5_large_pipeline = pipeline("summarization", model="t5-large", token = API_KEYS['HF'])
+
+# FLAN-T5-large for more powerful summarization, not having "simplification".
+flan_t5_large_pipeline = pipeline("summarization", model="google/flan-t5-large", token = API_KEYS['HF'])
+
+# Load Qwen-7B-Chat with int4 quantization using bitsandbytes
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_quant_type="nf4",  # or "fp4"
+    bnb_4bit_compute_dtype=torch.float16
+)
+
+qwen_tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen-7B-Chat", token=API_KEYS['HF'], trust_remote_code=True)
+qwen_model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen-7B-Chat",
+    token=API_KEYS['HF'],
+    quantization_config=bnb_config,
+    trust_remote_code=True,  # Trust the remote code for model loading
+)
+
+qwen_pipeline = TextGenerationPipeline(model=qwen_model, tokenizer=qwen_tokenizer)
 
 # Function to get synonyms from a Thesaurus API.
 def get_synonyms(word):
     """Lookup synonyms for a given word using a Thesaurus API and return a list of synonyms."""
     # Here we use the API Ninjas Thesaurus API.
     api_url = f"https://api.api-ninjas.com/v1/thesaurus?word={word}"
-    headers = {"X-Api-Key": "API_KEYS['ninja]"}  # Replace with your actual API key.
+    headers = {"X-Api-Key": API_KEYS['ninja']}  # Replace with your API key. look at the GitHub repo for the readme.md for how to create an API key.
     try:
         response = requests.get(api_url, headers=headers)
         if response.status_code == 200:
@@ -36,77 +58,125 @@ def get_synonyms(word):
         # Handle any exceptions (e.g., network issues)
         return []
 
-# Main script functionality
-def main():
-    # 1. Get user input for the text to simplify
-    text = input("Enter the text to be simplified:\n")
 
-    print(f"Flesch Reading Ease: {textstat.flesch_reading_ease(text)}")
-    print(f"Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(text)}") #a score of 9.3 means that a ninth grader would be able to understand that sentence
-    print(f"Gunning Fog Score:: {textstat.gunning_fog(text)}") # returns the FOG index, a 9.3 means that a ninth grader will understand the paragraph
-#    print(f"Smog Index Score: {textstat.smog_index(text)}") #needs 30 sentences to give a valid score. 9.3 means a ninth grader will understand
-    print(f"Automated readability index: {textstat.automated_readability_index(text)}") # gives a number that approximates the grade level needed to understand a 9.5 means between a 9th and 10th grader
-    print(f"Coleman Liau index score: {textstat.coleman_liau_index(text)}") # same as the other a 9.3 means a 9th grader will understand
-    print(f"Linsar write Formula score: {textstat.linsear_write_formula(text)}") # same as the above a 9.3 means a 9th grader will understand
-    print(f"Dale Chall readability Grade: {textstat.dale_chall_readability_score(text)}") # Looks up the most commonly used 3000 english words, and returns a grade using the Dale-Chall formula.
-    print(f" Readability consensus level: {textstat.text_standard(text, float_output=False)}") # sums up the above tests and returns the estimated grade
-    print(f"Spache Readability Formula Level: {textstat.spache_readability(text)}") # Returns a grade level of the text
-    print(f"Reading time: {textstat.reading_time(text, ms_per_char=14.69)}") # Returns the reading time in ms 
-    print(f"Amount of syllables: {textstat.syllable_count(text)}") # Syllable count
-    print(f"Lexicon count: {textstat.lexicon_count(text, removepunct=True)}") # amount of words in the sentence/text
+# Streamlit App
+st.title("Text Simplification and Readability Analysis")
 
+# Get user input for the text to simplify
+text = st.text_area("Enter the text to be simplified:")
 
-
+if text:
+    # Display readability scores for the original text
+    st.write("### Original Text Readability Scores")
+    st.write(f"Flesch Reading Ease: {textstat.flesch_reading_ease(text)}")
+    st.write(f"Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(text)}")
+    st.write(f"Gunning Fog Score: {textstat.gunning_fog(text)}")
+    st.write(f"Automated Readability Index: {textstat.automated_readability_index(text)}")
+    st.write(f"Coleman Liau Index: {textstat.coleman_liau_index(text)}")
+    st.write(f"Linsar Write Formula: {textstat.linsear_write_formula(text)}")
+    st.write(f"Dale Chall Readability Grade: {textstat.dale_chall_readability_score(text)}")
+    st.write(f"Readability Consensus Level: {textstat.text_standard(text, float_output=False)}")
+    st.write(f"Spache Readability Formula Level: {textstat.spache_readability(text)}")
+    st.write(f"Reading Time: {textstat.reading_time(text, ms_per_char=14.69)}")
+    st.write(f"Syllable Count: {textstat.syllable_count(text)}")
+    st.write(f"Lexicon Count: {textstat.lexicon_count(text, removepunct=True)}")
 
     # 2. Generate simplified text using BART summarization model
-    # We use max_length and min_length to control summary length; adjust as needed.
-    bart_result = bart_summarizer(text, max_length=120, min_length=30, do_sample=False)
+    bart_result = bart_pipeline(text, max_length=120, min_length=30, do_sample=False)
     simplified_bart = bart_result[0]['summary_text']
-    
-    # 3. Generate simplified text using T5 model.
-    # Important: prefix the text with "summarize: " for T5 to signal the task.
-    t5_input = "summarize: " + text
-    t5_result = t5_summarizer(t5_input, max_length=120, min_length=30, do_sample=False)
-    simplified_t5 = t5_result[0]['summary_text']
-    
-    # 4. Print the original and simplified texts
-    print("\nOriginal Text:\n" + text)
 
-    print("\nSimplified Text (BART):\n" + simplified_bart)
-    print(f"Simplified Bart Reading ease: {textstat.flesch_reading_ease(simplified_bart)}")
-    print(f"Simplified Bart Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(simplified_bart)}") #a score of 9.3 means that a ninth grader would be able to understand that sentence
-    print(f"Simplified Bart Gunning Fog Score:: {textstat.gunning_fog(simplified_bart)}") # returns the FOG index, a 9.3 means that a ninth grader will understand the paragraph
-#    print(f"Smog Index Score: {textstat.smog_index(text)}") #needs 30 sentences to give a valid score. 9.3 means a ninth grader will understand
-    print(f"Simplified Bart Automated readability index: {textstat.automated_readability_index(simplified_bart)}") # gives a number that approximates the grade level needed to understand a 9.5 means between a 9th and 10th grader
-    print(f"Simplified Bart Coleman Liau index score: {textstat.coleman_liau_index(simplified_bart)}") # same as the other a 9.3 means a 9th grader will understand
-    print(f"Simplified Bart Linsar write Formula score: {textstat.linsear_write_formula(simplified_bart)}") # same as the above a 9.3 means a 9th grader will understand
-    print(f"Simplified Bart Dale Chall readability Grade: {textstat.dale_chall_readability_score(simplified_bart)}") # Looks up the most commonly used 3000 english words, and returns a grade using the Dale-Chall formula.
-    print(f"Simplified Bart Readability consensus level: {textstat.text_standard(simplified_bart, float_output=False)}") # sums up the above tests and returns the estimated grade
-    print(f"Simplified Bart Spache Readability Formula Level: {textstat.spache_readability(simplified_bart)}") # Returns a grade level of the text
-    print(f"Simplified Bart Reading time: {textstat.reading_time(simplified_bart, ms_per_char=14.69)}") # Returns the reading time in ms 
-    print(f"Simplified Bart Amount of syllables: {textstat.syllable_count(simplified_bart)}") # Syllable count
-    print(f"Simplified Bart Lexicon count: {textstat.lexicon_count(simplified_bart, removepunct=True)}") # amount of words in the sentence/text
-    
-    print("\nSimplified Text (T5):\n" + simplified_t5)
-    print(f"Simplified T5 Reading ease: {textstat.flesch_reading_ease(simplified_t5)}")
-    print(f"Simplified T5 Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(simplified_t5)}") #a score of 9.3 means that a ninth grader would be able to understand that sentence
-    print(f"Simplified T5 Gunning Fog Score:: {textstat.gunning_fog(simplified_t5)}") # returns the FOG index, a 9.3 means that a ninth grader will understand the paragraph
-#    print(f"Smog Index Score: {textstat.smog_index(text)}") #needs 30 sentences to give a valid score. 9.3 means a ninth grader will understand
-    print(f"Simplified T5 Automated readability index: {textstat.automated_readability_index(simplified_t5)}") # gives a number that approximates the grade level needed to understand a 9.5 means between a 9th and 10th grader
-    print(f"Simplified T5 Coleman Liau index score: {textstat.coleman_liau_index(simplified_t5)}") # same as the other a 9.3 means a 9th grader will understand
-    print(f"Simplified T5 Linsar write Formula score: {textstat.linsear_write_formula(simplified_t5)}") # same as the above a 9.3 means a 9th grader will understand
-    print(f"Simplified T5 Dale Chall readability Grade: {textstat.dale_chall_readability_score(simplified_t5)}") # Looks up the most commonly used 3000 english words, and returns a grade using the Dale-Chall formula.
-    print(f"Simplified T5 Readability consensus level: {textstat.text_standard(simplified_t5, float_output=False)}") # sums up the above tests and returns the estimated grade
-    print(f"Simplified T5 Spache Readability Formula Level: {textstat.spache_readability(simplified_t5)}") # Returns a grade level of the text
-    print(f"Simplified T5 Reading time: {textstat.reading_time(simplified_t5, ms_per_char=14.69)}") # Returns the reading time in ms 
-    print(f"Simplified T5 Amount of syllables: {textstat.syllable_count(simplified_t5)}") # Syllable count
-    print(f"Simplified T5 Lexicon count: {textstat.lexicon_count(simplified_t5, removepunct=True)}") # amount of words in the sentence/text
-    
-    
-    
+    # 3. Generate simplified text using T5 model.
+    t5_large_input = "summarize: " + text
+    t5_large_result = t5_large_pipeline(t5_large_input, max_length=120, min_length=30, do_sample=False)
+    simplified_t5_large = t5_large_result[0]['summary_text']
+
+    # 4. Generate simplified text using FLAN-T5-Large model.
+    flan_t5_large_input = "summarize: " + text
+    flan_t5_large_result = flan_t5_large_pipeline(flan_t5_large_input, max_length=120, min_length=30, do_sample=False)
+    simplified_flan_t5_large = flan_t5_large_result[0]['summary_text']
+
+    # 5. Generate simplified text using Qwen-7B-Chat
+    prompt = f"Please provide a simplification of the following text:\n{text}\n\nSummary:"
+    qwen_result = qwen_pipeline(prompt, max_new_tokens=150, do_sample=False, truncation=True)
+    simplified_qwen = qwen_result[0]['generated_text'].replace(prompt, "").strip()
+
+    bart_results = bart_pipeline(prompt, max_new_tokens=150, do_sample=False, truncation=True)
+    simplified_bart = bart_results[0]['generated_text'].replace(prompt, "").strip()
+
+    t5_large_results = t5_large_pipeline(prompt, max_new_tokens=150, do_sample=False, truncation=True)
+    simplified_t5 = t5_large_results[0]['generated_text'].replace(prompt, "").strip()
+
+
+    flan_t5_large_results= flan_t5_large_pipeline(prompt, max_new_tokens=150, do_sample=False, truncation=True)
+    simplified_flan_t5_large = flan_t5_large_results[0]['generated_text'].replace(prompt, "").strip()
+
+#    Display simplified texts and their readability scores
+    st.write("### Simplified Text (BART)")
+    st.write(simplified_bart)
+    st.write(f"Reading Ease: {textstat.flesch_reading_ease(simplified_bart)}")
+    st.write(f"Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(simplified_bart)}")
+    st.write(f"Gunning Fog Score: {textstat.gunning_fog(simplified_bart)}")
+    st.write(f"Automated Readability Index: {textstat.automated_readability_index(simplified_bart)}")
+    st.write(f"Coleman Liau Index: {textstat.coleman_liau_index(simplified_bart)}")
+    st.write(f"Linsar Write Formula: {textstat.linsear_write_formula(simplified_bart)}")
+    st.write(f"Dale Chall Readability Grade: {textstat.dale_chall_readability_score(simplified_bart)}")
+    st.write(f"Readability Consensus Level: {textstat.text_standard(simplified_bart, float_output=False)}")
+    st.write(f"Spache Readability Formula Level: {textstat.spache_readability(simplified_bart)}")
+    st.write(f"Reading Time: {textstat.reading_time(simplified_bart, ms_per_char=14.69)}")
+    st.write(f"Syllable Count: {textstat.syllable_count(simplified_bart)}")
+    st.write(f"Lexicon Count: {textstat.lexicon_count(simplified_bart, removepunct=True)}")
+
+    st.write("### Simplified Text (T5)")
+    st.write(simplified_t5)
+    st.write(f"Reading Ease: {textstat.flesch_reading_ease(simplified_t5)}")
+    st.write(f"Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(simplified_t5)}")
+    st.write(f"Gunning Fog Score: {textstat.gunning_fog(simplified_t5)}")
+    st.write(f"Automated Readability Index: {textstat.automated_readability_index(simplified_t5)}")
+    st.write(f"Coleman Liau Index: {textstat.coleman_liau_index(simplified_t5)}")
+    st.write(f"Linsar Write Formula: {textstat.linsear_write_formula(simplified_t5)}")
+    st.write(f"Dale Chall Readability Grade: {textstat.dale_chall_readability_score(simplified_t5)}")
+    st.write(f"Readability Consensus Level: {textstat.text_standard(simplified_t5, float_output=False)}")
+    st.write(f"Spache Readability Formula Level: {textstat.spache_readability(simplified_t5)}")
+    st.write(f"Reading Time: {textstat.reading_time(simplified_t5, ms_per_char=14.69)}")
+    st.write(f"Syllable Count: {textstat.syllable_count(simplified_t5)}")
+    st.write(f"Lexicon Count: {textstat.lexicon_count(simplified_t5, removepunct=True)}")
+
+    st.write("### Simplified Text (FLAN-T5-Large)")
+    st.write(simplified_flan_t5_large)
+    st.write(f"Reading Ease: {textstat.flesch_reading_ease(simplified_flan_t5_large)}")
+    st.write(f"Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(simplified_flan_t5_large)}")
+    st.write(f"Gunning Fog Score: {textstat.gunning_fog(simplified_flan_t5_large)}")
+    st.write(f"Automated Readability Index: {textstat.automated_readability_index(simplified_flan_t5_large)}")
+    st.write(f"Coleman Liau Index: {textstat.coleman_liau_index(simplified_flan_t5_large)}")
+    st.write(f"Linsar Write Formula: {textstat.linsear_write_formula(simplified_flan_t5_large)}")
+    st.write(f"Dale Chall Readability Grade: {textstat.dale_chall_readability_score(simplified_flan_t5_large)}")
+    st.write(f"Readability Consensus Level: {textstat.text_standard(simplified_flan_t5_large, float_output=False)}")
+    st.write(f"Spache Readability Formula Level: {textstat.spache_readability(simplified_flan_t5_large)}")
+    st.write(f"Reading Time: {textstat.reading_time(simplified_flan_t5_large, ms_per_char=14.69)}")
+    st.write(f"Syllable Count: {textstat.syllable_count(simplified_flan_t5_large)}")
+    st.write(f"Lexicon Count: {textstat.lexicon_count(simplified_flan_t5_large, removepunct=True)}")
+
+
+    st.write("### Simplified Text (Qwen-7B-Chat)")
+    st.write(simplified_qwen)
+    st.write(f"Reading Ease: {textstat.flesch_reading_ease(simplified_qwen)}")
+    st.write(f"Flesch-Kincaid Grade Level: {textstat.flesch_kincaid_grade(simplified_qwen)}")
+    st.write(f"Gunning Fog Score: {textstat.gunning_fog(simplified_qwen)}")
+    st.write(f"Automated Readability Index: {textstat.automated_readability_index(simplified_qwen)}")
+    st.write(f"Coleman Liau Index: {textstat.coleman_liau_index(simplified_qwen)}")
+    st.write(f"Linsar Write Formula: {textstat.linsear_write_formula(simplified_qwen)}")
+    st.write(f"Dale Chall Readability Grade: {textstat.dale_chall_readability_score(simplified_qwen)}")
+    st.write(f"Readability Consensus Level: {textstat.text_standard(simplified_qwen, float_output=False)}")
+    st.write(f"Spache Readability Formula Level: {textstat.spache_readability(simplified_qwen)}")
+    st.write(f"Reading Time: {textstat.reading_time(simplified_qwen, ms_per_char=14.69)}")
+    st.write(f"Syllable Count: {textstat.syllable_count(simplified_qwen)}")
+    st.write(f"Lexicon Count: {textstat.lexicon_count(simplified_qwen, removepunct=True)}")
+
     # 5. Highlight differences between original and simplified texts
-    print("\nDifferences between original and BART-simplified text:")
-    # Use difflib to compare word by word
+    st.write("### Differences between Original and Simplified Texts")
+
+    # Compare BART output
+    st.write("#### BART-simplified Text Differences:")
     orig_tokens = text.split()
     bart_tokens = simplified_bart.split()
     matcher = difflib.SequenceMatcher(None, orig_tokens, bart_tokens)
@@ -114,50 +184,87 @@ def main():
         if tag == 'replace':
             orig_segment = " ".join(orig_tokens[i1:i2])
             new_segment = " ".join(bart_tokens[j1:j2])
-            print(f"  Replaced \"{orig_segment}\" ➜ \"{new_segment}\"")
+            st.write(f"Replaced: \"{orig_segment}\" ➜ \"{new_segment}\"")
         elif tag == 'delete':
             orig_segment = " ".join(orig_tokens[i1:i2])
-            print(f"  Removed \"{orig_segment}\"")
+            st.write(f"Removed: \"{orig_segment}\"")
         elif tag == 'insert':
             new_segment = " ".join(bart_tokens[j1:j2])
-            print(f"  Added \"{new_segment}\"")
-    # Repeat for T5
-    print("\nDifferences between original and T5-simplified text:")
-    t5_tokens = simplified_t5.split()
-    matcher = difflib.SequenceMatcher(None, orig_tokens, t5_tokens)
+            st.write(f"Added: \"{new_segment}\"")
+
+
+
+#     Compare T5-Large output
+    st.write("#### T5-Large-simplified Text Differences:")
+    t5_large_tokens = simplified_t5_large.split()
+    matcher = difflib.SequenceMatcher(None, orig_tokens, t5_large_tokens)
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == 'replace':
             orig_segment = " ".join(orig_tokens[i1:i2])
-            new_segment = " ".join(t5_tokens[j1:j2])
-            print(f"  Replaced \"{orig_segment}\" ➜ \"{new_segment}\"")
+            new_segment = " ".join(t5_large_tokens[j1:j2])
+            st.write(f"Replaced: \"{orig_segment}\" ➜ \"{new_segment}\"")
         elif tag == 'delete':
             orig_segment = " ".join(orig_tokens[i1:i2])
-            print(f"  Removed \"{orig_segment}\"")
+            st.write(f"Removed: \"{orig_segment}\"")
         elif tag == 'insert':
-            new_segment = " ".join(t5_tokens[j1:j2])
-            print(f"  Added \"{new_segment}\"")
-    
-    # 6. Suggest synonyms for words in the simplified texts that are different from the original
-    # Identify "new" words in the BART simplified text
+            new_segment = " ".join(t5_large_tokens[j1:j2])
+            st.write(f"Added: \"{new_segment}\"")
+
+
+
+
+
+#     Compare FLAN-T5-Large output
+    st.write("#### FLAN-T5-Large-simplified Text Differences:")
+    flan_t5_large_tokens = simplified_flan_t5_large.split()
+    matcher = difflib.SequenceMatcher(None, orig_tokens, flan_t5_large_tokens)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'replace':
+            orig_segment = " ".join(orig_tokens[i1:i2])
+            new_segment = " ".join(flan_t5_large_tokens[j1:j2])
+            st.write(f"Replaced: \"{orig_segment}\" ➜ \"{new_segment}\"")
+        elif tag == 'delete':
+            orig_segment = " ".join(orig_tokens[i1:i2])
+            st.write(f"Removed: \"{orig_segment}\"")
+        elif tag == 'insert':
+            new_segment = " ".join(flan_t5_large_tokens[j1:j2])
+            st.write(f"Added: \"{new_segment}\"")
+
+
+#     Compare Qwen-7B-Chat output
+    st.write("#### Qwen-7B-Chat-simplified Text Differences:")
+    qwen_tokens = simplified_qwen.split()
+    matcher = difflib.SequenceMatcher(None, orig_tokens, qwen_tokens)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'replace':
+            orig_segment = " ".join(orig_tokens[i1:i2])
+            new_segment = " ".join(qwen_tokens[j1:j2])
+            st.write(f"Replaced: \"{orig_segment}\" ➜ \"{new_segment}\"")
+        elif tag == 'delete':
+            orig_segment = " ".join(orig_tokens[i1:i2])
+            st.write(f"Removed: \"{orig_segment}\"")
+        elif tag == 'insert':
+            new_segment = " ".join(qwen_tokens[j1:j2])
+            st.write(f"Added: \"{new_segment}\"")
+
+#     Suggest synonyms for words in the simplified texts
+    st.write("### Synonym Suggestions for New Words in Simplified Texts")
+
     bart_new_words = set([w.strip(".,!?").lower() for w in bart_tokens if w.lower() not in [ow.lower() for ow in orig_tokens]])
-    # Identify new words in the T5 simplified text
-    t5_new_words = set([w.strip(".,!?").lower() for w in t5_tokens if w.lower() not in [ow.lower() for ow in orig_tokens]])
-    
-    new_words = bart_new_words.union(t5_new_words)
+    t5_large_new_words = set([w.strip(".,!?").lower() for w in t5_large_tokens if w.lower() not in [ow.lower() for ow in orig_tokens]])
+    flan_t5_large_new_words = set([w.strip(".,!?").lower() for w in flan_t5_large_tokens if w.lower() not in [ow.lower() for ow in orig_tokens]])
+    qwen_new_words = set([w.strip(".,!?").lower() for w in qwen_tokens if w.lower() not in [ow.lower() for ow in orig_tokens]])
+
+    # Combine new words from all models
+    new_words = bart_new_words.union(flan_t5_large_new_words).union(t5_large_new_words).union(qwen_new_words)
     if new_words:
-        print("\nSynonym suggestions for simplified words:")
         for word in sorted(new_words):
             if not word:  # skip empty strings if any
                 continue
             synonyms = get_synonyms(word)
             if synonyms:
-                print(f"  {word} ➜ {', '.join(synonyms[:5])}")  # show up to 5 synonyms
+                st.write(f"{word} ➜ {', '.join(synonyms[:5])}")  # show up to 5 synonyms
             else:
-                print(f"  {word} ➜ (no synonyms found)")
+                st.write(f"{word} ➜ (no synonyms found)")
     else:
-        print("\nNo new words to suggest synonyms for.")
-        
-
-# Entry point for script execution
-if __name__ == "__main__":
-    main()
+        st.write("No new words to suggest synonyms for.")
